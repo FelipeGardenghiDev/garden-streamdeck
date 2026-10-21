@@ -1,0 +1,6 @@
+{
+  "appId": "com.gardenghi.gardenstreamdeck",
+  "appName": "Garden StreamDeck",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}
