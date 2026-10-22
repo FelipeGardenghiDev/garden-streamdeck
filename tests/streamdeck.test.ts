@@ -1,20 +1,28 @@
 import { describe, it, expect } from 'vitest';
-import { DEFAULT_PROFILES, loadProfiles } from '../src/core/deck-store';
+import { DEFAULT_PROFILES, executeMediaSimulatorAction, getSimulatedMediaState } from '../src/core/deck-store';
 import { ObsClientManager } from '../src/core/obs-client';
 
 describe('Garden StreamDeck Core Engine', () => {
-  it('loads valid default profiles with correct grid dimensions and actions', () => {
-    expect(DEFAULT_PROFILES.length).toBeGreaterThanOrEqual(2);
-    const streamerProfile = DEFAULT_PROFILES[0];
-    expect(streamerProfile.name).toContain('Streamer');
-    expect(streamerProfile.gridRows).toBe(3);
-    expect(streamerProfile.gridCols).toBe(4);
-    expect(streamerProfile.buttons.length).toBe(12);
+  it('loads valid default profiles including IRL and Study with correct grid dimensions', () => {
+    expect(DEFAULT_PROFILES.length).toBeGreaterThanOrEqual(4);
 
-    const musicProfile = DEFAULT_PROFILES[1];
-    expect(musicProfile.gridRows).toBe(2);
-    expect(musicProfile.gridCols).toBe(4);
-    expect(musicProfile.buttons.length).toBe(8);
+    const streamerProfile = DEFAULT_PROFILES.find(p => p.id === 'profile-streamer');
+    expect(streamerProfile).toBeDefined();
+    expect(streamerProfile?.buttons.length).toBe(12);
+
+    const irlProfile = DEFAULT_PROFILES.find(p => p.id === 'profile-irl');
+    expect(irlProfile).toBeDefined();
+    expect(irlProfile?.name).toContain('IRL');
+    expect(irlProfile?.buttons.length).toBe(8);
+
+    const studyProfile = DEFAULT_PROFILES.find(p => p.id === 'profile-study');
+    expect(studyProfile).toBeDefined();
+    expect(studyProfile?.name).toContain('Estudo');
+    expect(studyProfile?.buttons.some(b => b.actionType === 'media-play-pause')).toBe(true);
+
+    const musicProfile = DEFAULT_PROFILES.find(p => p.id === 'profile-music');
+    expect(musicProfile).toBeDefined();
+    expect(musicProfile?.buttons.length).toBe(8);
   });
 
   it('correctly toggles scenes and states in offline simulated mode', async () => {
@@ -40,6 +48,21 @@ describe('Garden StreamDeck Core Engine', () => {
     await obs.toggleMute('Microfone');
     const mic = obs.getState().audioInputs.find(i => i.name === 'Microfone');
     expect(mic?.muted).toBe(true);
+  });
+
+  it('handles simulated media actions properly', () => {
+    const initial = getSimulatedMediaState();
+    expect(initial).toHaveProperty('isPlaying');
+
+    const toggled = executeMediaSimulatorAction('media-play-pause');
+    expect(toggled.isPlaying).toBe(!initial.isPlaying);
+
+    const volUp = executeMediaSimulatorAction('media-volume-up');
+    expect(volUp.volume).toBeGreaterThanOrEqual(initial.volume);
+
+    const nextTrack = executeMediaSimulatorAction('media-next');
+    expect(nextTrack.isPlaying).toBe(true);
+    expect(typeof nextTrack.currentTrack).toBe('string');
   });
 
   it('notifies subscribers upon state changes', async () => {

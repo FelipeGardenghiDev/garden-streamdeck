@@ -5,7 +5,13 @@ export type DeckActionType =
   | 'obs-toggle-stream'
   | 'obs-toggle-source'
   | 'audio-sfx-play'
-  | 'timer-countdown';
+  | 'timer-countdown'
+  | 'media-play-pause'
+  | 'media-next'
+  | 'media-prev'
+  | 'media-volume-up'
+  | 'media-volume-down'
+  | 'media-mute';
 
 export interface DeckButton {
   id: string;
@@ -31,4 +37,10 @@ export interface ObsConnectionConfig {
   port: number; // Ex: 4455
   password?: string;
   autoReconnect: boolean;
+}
+
+export interface MediaSimulatorState {
+  isPlaying: boolean;
+  volume: number; // 0 a 100
+  currentTrack: string;
 }

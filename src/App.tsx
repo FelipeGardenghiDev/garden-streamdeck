@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { obsManager, ObsStatusState } from './core/obs-client';
-import { loadProfiles, saveProfiles } from './core/deck-store';
-import { DeckProfile, DeckButton, ObsConnectionConfig } from './types';
+import { loadProfiles, executeMediaSimulatorAction, getSimulatedMediaState } from './core/deck-store';
+import { DeckProfile, DeckButton, ObsConnectionConfig, MediaSimulatorState } from './types';
 import { DeckButtonComponent } from './components/DeckButtonComponent';
 import { SettingsModal } from './components/SettingsModal';
-import { Radio, Disc, Mic, VolumeX, Settings, Wifi, WifiOff, RefreshCw } from 'lucide-react';
+import { Radio, Disc, Settings, Wifi, WifiOff, Music } from 'lucide-react';
 
 export const App: React.FC = () => {
-  const [profiles, setProfiles] = useState<DeckProfile[]>(loadProfiles);
+  const [profiles] = useState<DeckProfile[]>(loadProfiles);
   const [activeProfileIndex, setActiveProfileIndex] = useState(0);
   const [obsState, setObsState] = useState<ObsStatusState>(obsManager.getState());
+  const [mediaState, setMediaState] = useState<MediaSimulatorState>(getSimulatedMediaState());
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [config, setConfig] = useState<ObsConnectionConfig>({
     host: '127.0.0.1',
@@ -45,6 +46,30 @@ export const App: React.FC = () => {
           await obsManager.toggleMute(button.actionPayload.inputName);
         }
         break;
+      case 'media-play-pause':
+      case 'media-next':
+      case 'media-prev':
+      case 'media-volume-up':
+      case 'media-volume-down':
+      case 'media-mute': {
+        const nextMedia = executeMediaSimulatorAction(button.actionType);
+        setMediaState(nextMedia);
+        // Beep sutil de feedback acústico local
+        try {
+          const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(button.actionType === 'media-volume-up' ? 660 : 440, ctx.currentTime);
+          gain.gain.setValueAtTime(0.08, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.12);
+        } catch {}
+        break;
+      }
       case 'audio-sfx-play':
         // Beep sintético local via Web Audio
         try {
@@ -81,7 +106,7 @@ export const App: React.FC = () => {
             <span>GARDEN DECK</span>
           </div>
 
-          <div className="hidden sm:flex items-center gap-2">
+          <div className="flex items-center gap-2">
             <select
               value={activeProfileIndex}
               onChange={(e) => setActiveProfileIndex(Number(e.target.value))}
@@ -96,8 +121,16 @@ export const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Live OBS Status Badges */}
+        {/* Live OBS / Media Status Badges */}
         <div className="flex items-center gap-2">
+          {mediaState.isPlaying && (
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-mono text-[10px] font-bold border border-indigo-500/30">
+              <Music className="w-3 h-3 animate-pulse text-indigo-400" />
+              <span className="truncate max-w-[130px]">{mediaState.currentTrack}</span>
+              <span className="text-slate-400">({mediaState.volume}%)</span>
+            </div>
+          )}
+
           {obsState.connected ? (
             <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-mono text-[10px] font-bold">
               <Wifi className="w-3 h-3" />
@@ -148,6 +181,7 @@ export const App: React.FC = () => {
               (btn.actionType === 'obs-switch-scene' && obsState.currentScene === btn.actionPayload?.sceneName) ||
               (btn.actionType === 'obs-toggle-stream' && obsState.streaming) ||
               (btn.actionType === 'obs-toggle-record' && obsState.recording) ||
+              (btn.actionType === 'media-play-pause' && mediaState.isPlaying) ||
               (btn.actionType === 'obs-toggle-mute' &&
                 obsState.audioInputs.find((i) => i.name === btn.actionPayload?.inputName)?.muted);
 
